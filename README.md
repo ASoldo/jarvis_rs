@@ -176,7 +176,7 @@ WantedBy=default.target
 
 ## 😎 Credits
 
-* Built in Rust by @ASoldo
+* Built in Rust by [ASoldo](https://github.com/ASoldo)
 * Inspired by [Jarvis Python prototype](https://github.com/llm-guy)
 * Uses:
 
