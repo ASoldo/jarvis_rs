@@ -160,7 +160,7 @@ WantedBy=default.target
 | `agent.rs`      | LLM interaction and tool invocation |
 | `speech.rs`     | Microphone listening with Vosk      |
 | `tts_engine.rs` | Voice output via RHVoice            |
-| `tools.rs`      | LangChain-style Rust tools          |
+| `tools.rs`      | Custom Rust tools for shell + codex |
 | `jarvis_io.rs`  | IO handling for `.jarvis` folder    |
 
 ---
@@ -176,14 +176,13 @@ WantedBy=default.target
 
 ## 😎 Credits
 
-* Built in Rust by @yourname
-* Inspired by \[Jarvis Python prototype]
+* Built in Rust by @ASoldo
+* Inspired by \[Jarvis Python prototype - LLM Guy](https://github.com/llm-guy)
 * Uses:
 
   * [Vosk](https://github.com/alphacep/vosk-api)
   * [Ollama](https://ollama.com)
   * [RHVoice](https://github.com/RHVoice/RHVoice)
-  * [LangChain](https://www.langchain.com)
 
 ---
 
