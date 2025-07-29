@@ -1,0 +1,66 @@
+[package]
+name = "jarvis_rust"
+version = "0.1.0"
+edition = "2021"
+
+# Jarvis is a voice‑activated assistant inspired by the Python project. This
+# crate depends on a handful of cross‑platform libraries for audio
+# capture/recognition, text‑to‑speech, and local language model
+# interaction. Where possible we choose recent versions of crates that are
+# widely available on crates.io and work across Linux, macOS and Windows.
+
+[dependencies]
+# Tokio provides the asynchronous runtime used throughout the application.
+tokio = { version = "1.38", features = ["macros", "rt-multi-thread", "time"] }
+
+# cpal is a cross‑platform audio I/O library. We use it to capture
+# microphone samples which are then fed into the Vosk speech recogniser.
+cpal = "0.15"
+
+# vosk provides safe bindings to the Vosk offline speech recognition
+# library. Note that you must install the Vosk dynamic library and model
+# files yourself; see the README for setup instructions. Version 0.3.1 is
+# the latest release at the time of writing and supports Linux, macOS and
+# Windows.
+vosk = "0.3.1"
+
+# tts is a high‑level wrapper around the system text‑to‑speech
+# facilities. It works on Linux (via Speech Dispatcher), Windows (via
+# SAPI) and macOS (via AVFoundation). We use it to render Jarvis's
+# responses out loud. Setting the `default` feature gives us access to
+# the synchronous API.
+tts = "0.25.0"
+
+# ollama-rs is the client library for interacting with a local Ollama
+# server. Version 0.3.2 exposes a simple API for generating responses
+# from local models such as Qwen. The `tokio` feature enables async
+# support.
+ollama-rs = { version = "0.3.2", features = ["tokio"] }
+
+# serde and serde_json are used for parsing potential JSON tool calls
+# returned by the language model.
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# dotenvy loads environment variables from a `.env` file at startup. This
+# mirrors the Python version which used python‑dotenv.
+dotenvy = "0.15"
+
+# anyhow simplifies error handling by providing a convenient `Result<T>
+# type alias and contextual error messages.
+anyhow = "1.0"
+
+# log and env_logger allow runtime logging with configurable levels.
+log = "0.4"
+env_logger = "0.10"
+
+# Adds support for waiting on a child process with a timeout. Used to
+# prevent Codex CLI calls from hanging indefinitely.
+wait-timeout = "0.2"
+
+# async-trait enables async functions inside trait definitions. It's used
+# internally by the agent module to define an asynchronous handler.
+async-trait = "0.1"
+
+# once_cell provides a simple way to initialise static data lazily.
+once_cell = "1.18"
