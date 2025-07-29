@@ -177,7 +177,7 @@ WantedBy=default.target
 ## 😎 Credits
 
 * Built in Rust by @ASoldo
-* Inspired by \[Jarvis Python prototype - LLM Guy](https://github.com/llm-guy)
+* Inspired by [Jarvis Python prototype](https://github.com/llm-guy)
 * Uses:
 
   * [Vosk](https://github.com/alphacep/vosk-api)
