@@ -28,11 +28,13 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result};
 
 mod agent;
+mod jarvis_io;
 mod speech;
 mod tools;
 mod tts_engine;
 
 use agent::Agent;
+use jarvis_io::JarvisIO;
 use speech::SpeechRecognizer;
 use tts_engine::TtsEngine;
 
@@ -77,7 +79,10 @@ async fn main() -> Result<()> {
     if let Some(name) = voice_name {
         match tts.set_voice_by_name(&name) {
             Ok(_) => log::info!("Using voice: {}", name),
-            Err(e) => log::warn!("Failed to set voice '{}': {e}. Falling back to default.", name),
+            Err(e) => log::warn!(
+                "Failed to set voice '{}': {e}. Falling back to default.",
+                name
+            ),
         }
     }
 
@@ -97,7 +102,14 @@ async fn main() -> Result<()> {
     let mut last_interaction = Instant::now();
     let timeout = Duration::from_secs(timeout_secs);
 
-    log::info!("Jarvis initialised. Waiting for wake word '{}'.", trigger_word);
+    let jarvis_io = JarvisIO::new();
+    jarvis_io.set_pid();
+    jarvis_io.write_status("idle");
+
+    log::info!(
+        "Jarvis initialised. Waiting for wake word '{}'.",
+        trigger_word
+    );
 
     loop {
         if !conversation_mode {
@@ -119,8 +131,10 @@ async fn main() -> Result<()> {
                             // Check whether the wake word appears anywhere in the transcript.
                             if lower.contains(&trigger_word.to_lowercase()) {
                                 log::info!("Wake word detected: {}", trimmed);
+                                jarvis_io.write_heard(trimmed);
                                 // Acknowledge the user and switch to conversation mode.
                                 tts.speak("Yes sir?").await.ok();
+                                jarvis_io.write_status("listening");
                                 conversation_mode = true;
                                 last_interaction = Instant::now();
                             }
@@ -146,6 +160,7 @@ async fn main() -> Result<()> {
                         // configured timeout then exit conversation mode.
                         if last_interaction.elapsed() > timeout {
                             log::info!("Conversation timeout. Returning to idle mode.");
+                            jarvis_io.write_status("idle");
                             conversation_mode = false;
                         }
                     } else {
@@ -160,26 +175,43 @@ async fn main() -> Result<()> {
                         // sleep immediately.
                         if lower.contains("shadow") {
                             tts.speak("Going silent.").await.ok();
+                            jarvis_io.write_status("idle");
                             conversation_mode = false;
                             continue;
                         }
                         log::info!("User command: {}", trimmed);
-                        // Delegate to the language model for all commands. We no longer filter
-                        // based on specific keywords; instead we rely on the language model's
-                        // built‑in reasoning and our existing timeout mechanism to avoid
-                        // pathological hangs. The `Agent` implementation ensures that
-                        // "think" blocks and Markdown are stripped before speaking, and
-                        // imposes a timeout on long running requests.
-                        let mut reply = agent
-                            .handle_command(trimmed)
-                            .await
-                            .context("failed to handle command via agent")?;
-                        // Provide a fallback if the model returns an empty string.
-                        if reply.trim().is_empty() {
-                            reply = "I'm sorry, I didn't understand. Please try again.".to_string();
+                        jarvis_io.write_heard(trimmed);
+                        // // Delegate to the language model for all commands. We no longer filter
+                        // // based on specific keywords; instead we rely on the language model's
+                        // // built‑in reasoning and our existing timeout mechanism to avoid
+                        // // pathological hangs. The `Agent` implementation ensures that
+                        // // "think" blocks and Markdown are stripped before speaking, and
+                        // // imposes a timeout on long running requests.
+                        // let mut reply = agent
+                        //     .handle_command(trimmed)
+                        //     .await
+                        //     .context("failed to handle command via agent")?;
+                        // // Provide a fallback if the model returns an empty string.
+                        // if reply.trim().is_empty() {
+                        //     reply = "I'm sorry, I didn't understand. Please try again.".to_string();
+                        // }
+                        // log::info!("Assistant response: {}", reply);
+                        // tts.speak(&reply).await.ok();
+                        match agent.handle_command(trimmed).await {
+                            Ok(reply) => {
+                                let reply = if reply.trim().is_empty() {
+                                    "I'm sorry, I didn't understand. Please try again.".to_string()
+                                } else {
+                                    reply
+                                };
+                                log::info!("Assistant response: {}", reply);
+                                jarvis_io.write_spoken(&reply); // <-- added
+                                jarvis_io.write_status("speaking"); // <-- added
+                                tts.speak(&reply).await.ok();
+                                jarvis_io.write_status("listening"); // <-- added
+                            }
+                            Err(e) => log::error!("Agent error: {e}"),
                         }
-                        log::info!("Assistant response: {}", reply);
-                        tts.speak(&reply).await.ok();
                     }
                 }
                 Err(e) => {
@@ -187,6 +219,7 @@ async fn main() -> Result<()> {
                     // If recognition fails repeatedly we still respect the
                     // timeout to avoid getting stuck.
                     if last_interaction.elapsed() > timeout {
+                        jarvis_io.write_status("idle");
                         conversation_mode = false;
                     }
                 }
@@ -194,3 +227,4 @@ async fn main() -> Result<()> {
         }
     }
 }
+
