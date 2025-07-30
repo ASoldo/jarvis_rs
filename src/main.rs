@@ -111,13 +111,16 @@ async fn main() -> Result<()> {
     // Initialise the language model client and agent.
     let agent = Agent::new(&model_name).await?;
 
-    // Fixed audio capture durations. In idle mode we listen for 5 seconds
-    // to detect the wake word. In conversation mode we record up to 10
-    // seconds for each user utterance. These durations were determined
-    // empirically to balance latency and completeness. If you need
-    // finer control over these values you can modify them here.
-    let idle_listen_secs: u64 = 5;
-    let convo_listen_secs: u64 = 10;
+    // Audio capture durations for wake word detection and user commands.
+    // These can be tuned via environment variables for faster responsiveness.
+    let idle_listen_secs: u64 = env::var("IDLE_LISTEN_SECS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(1);
+    let convo_listen_secs: u64 = env::var("CONVO_LISTEN_SECS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(8);
 
     // Conversation state.
     let mut conversation_mode = false;
@@ -129,8 +132,10 @@ async fn main() -> Result<()> {
     jarvis_io.write_status("idle");
 
     log::info!(
-        "Jarvis initialised. Waiting for wake word '{}'.",
-        trigger_word
+        "Jarvis initialised. Waiting for wake word '{}' (idle listen: {}s, convo listen: {}s).",
+        trigger_word,
+        idle_listen_secs,
+        convo_listen_secs
     );
 
     // Handle Ctrl-C (SIGINT) to allow graceful shutdown

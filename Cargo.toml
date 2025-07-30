@@ -2,6 +2,10 @@
 name = "jarvis_rust"
 version = "0.1.0"
 edition = "2021"
+description = "Offline, voice-activated personal assistant built in Rust."
+license = "MIT"
+readme = "README.md"
+keywords = ["voice-assistant", "offline", "speech-recognition", "rust", "llm"]
 
 # Jarvis is a voice‑activated assistant inspired by the Python project. This
 # crate depends on a handful of cross‑platform libraries for audio

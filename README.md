@@ -1,4 +1,4 @@
-# Jarvis - Offline Voice Assistant in Rust
+# Jarvis v1.0.0 - Offline Voice Assistant in Rust
 
 Jarvis is a fully offline, voice-activated personal assistant built in Rust. Inspired by the Python prototype, this version offers robust performance, cross-platform compatibility, and modular integration with CLI tools, LLMs (via Ollama), and text-to-speech engines.
 
@@ -63,7 +63,7 @@ target/release/jarvis
 
 ### 3. Configure `.env`
 
-Create a file named `.env` in the project root or next to the binary:
+# Create a file named `.env` in the project root or next to the binary:
 
 ```env
 VOSK_MODEL_PATH=/home/you/models/vosk-model-small-en-us-0.15
@@ -72,6 +72,9 @@ VOICE_NAME=slt
 TRIGGER_WORD=jarvis
 CONVERSATION_TIMEOUT=30
 MIC_NAME_KEYWORD=usb
+# Tune listen durations for faster responsiveness:
+IDLE_LISTEN_SECS=2       # seconds to listen for wake word (default: 2)
+CONVO_LISTEN_SECS=5      # seconds to capture each command (default: 5)
 ```
 
 > You can run without `.env` by exporting the variables in your shell.
