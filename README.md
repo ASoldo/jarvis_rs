@@ -1,3 +1,6 @@
+<img width="379" height="24" alt="image" src="https://github.com/user-attachments/assets/6a5259cd-7eec-4a79-9039-fa3760d19f63" />
+
+
 # Jarvis v1.0.0 - Offline Voice Assistant in Rust
 
 Jarvis is a fully offline, voice-activated personal assistant built in Rust. Inspired by the Python prototype, this version offers robust performance, cross-platform compatibility, and modular integration with CLI tools, LLMs (via Ollama), and text-to-speech engines.
