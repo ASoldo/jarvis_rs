@@ -216,13 +216,11 @@ impl SpeechRecognizer {
 
         let start_time = Instant::now();
         let mut samples: Vec<i16> = Vec::new();
-        // We'll stop recording early if we detect a period of silence after
-        // initial speech. Define a simple amplitude threshold and a
-        // silence timeout. When audio levels remain below the threshold
-        // for `silence_timeout` after speech has started, we break out.
-        let silence_threshold: i16 = 500;
-        let silence_timeout = Duration::from_millis(800);
-        let min_capture_time = Duration::from_millis(1000);
+        // Stop recording early when we see real silence after speech.
+        // Increase threshold to ignore low-level hum and allow longer pauses.
+        let silence_threshold: i16 = 1000;
+        let silence_timeout = Duration::from_millis(1500);
+        let min_capture_time = Duration::from_millis(500);
         let mut last_speech = Instant::now();
         let mut speech_started = false;
         // Pull chunks off the channel until the timeout expires. We use a

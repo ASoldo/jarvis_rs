@@ -56,6 +56,26 @@ use tts_engine::TtsEngine;
 /// entire transcript; they are not removed from legitimate commands.
 const NOISE_WORDS: &[&str] = &["the", "uh", "um", "a"];
 
+/// Trim leading/trailing single-token noise words (e.g. "the", "uh")
+fn strip_noise_words(text: &str) -> String {
+    let mut tokens: Vec<&str> = text.split_whitespace().collect();
+    // Drop noise words from the start
+    while tokens
+        .first()
+        .map_or(false, |t| NOISE_WORDS.contains(&t.to_lowercase().as_str()))
+    {
+        tokens.remove(0);
+    }
+    // Drop noise words from the end
+    while tokens
+        .last()
+        .map_or(false, |t| NOISE_WORDS.contains(&t.to_lowercase().as_str()))
+    {
+        tokens.pop();
+    }
+    tokens.join(" ")
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Load environment variables from `.env` if present.
@@ -134,16 +154,13 @@ async fn main() -> Result<()> {
                     log::debug!("Idle recognised transcript: {}", transcript);
                     let trimmed = transcript.trim();
                     if !trimmed.is_empty() {
-                        let lower = trimmed.to_lowercase();
-                        // If the entire transcript is a known noise word, ignore it.
-                        if NOISE_WORDS.contains(&lower.as_str()) {
-                            // Treat as silence
-                        } else {
-                            // Check whether the wake word appears anywhere in the transcript.
+                        let cleaned = strip_noise_words(trimmed);
+                        if !cleaned.is_empty() {
+                            let lower = cleaned.to_lowercase();
+                            // Check whether the wake word appears in the cleaned transcript.
                             if lower.contains(&trigger_word.to_lowercase()) {
-                                log::info!("Wake word detected: {}", trimmed);
-                                jarvis_io.write_heard(trimmed);
-                                // Acknowledge the user and switch to conversation mode.
+                                log::info!("Wake word detected: {}", cleaned);
+                                jarvis_io.write_heard(&cleaned);
                                 tts.speak("Yes sir?").await.ok();
                                 jarvis_io.write_status("listening");
                                 conversation_mode = true;
@@ -176,22 +193,21 @@ async fn main() -> Result<()> {
                         }
                     } else {
                         last_interaction = Instant::now();
-                        // Convert to lowercase for shadow detection and noise filtering.
-                        let lower = trimmed.to_lowercase();
-                        // If the entire transcript is a noise word, ignore it and continue listening.
-                        if NOISE_WORDS.contains(&lower.as_str()) {
+                        // Strip spurious noise tokens from the ends.
+                        let cleaned = strip_noise_words(trimmed);
+                        if cleaned.is_empty() {
                             continue;
                         }
-                        // Check for the special "shadow" phrase which tells Jarvis to go back to
-                        // sleep immediately.
+                        let lower = cleaned.to_lowercase();
+                        // "shadow" tells Jarvis to go back to sleep immediately.
                         if lower.contains("shadow") {
                             tts.speak("Going silent.").await.ok();
                             jarvis_io.write_status("idle");
                             conversation_mode = false;
                             continue;
                         }
-                        log::info!("User command: {}", trimmed);
-                        jarvis_io.write_heard(trimmed);
+                        log::info!("User command: {}", cleaned);
+                        jarvis_io.write_heard(&cleaned);
                         // // Delegate to the language model for all commands. We no longer filter
                         // // based on specific keywords; instead we rely on the language model's
                         // // built‑in reasoning and our existing timeout mechanism to avoid
