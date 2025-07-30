@@ -21,17 +21,39 @@ pub fn run_shell_task(command: &str) -> Result<String> {
     if trimmed.is_empty() {
         return Ok("No command provided.".to_string());
     }
-    // On Windows use `cmd /C`, on other platforms use `sh -c`.
+    // Handle directory changes specially: update persistent working directory.
+    let jarvis_io = crate::jarvis_io::JarvisIO::new();
+    if let Some(arg) = trimmed.strip_prefix("cd ") {
+        // Determine new path relative to current working directory if needed.
+        let target = if std::path::Path::new(arg).is_absolute() {
+            std::path::PathBuf::from(arg)
+        } else if let Some(cwd) = jarvis_io.read_working_directory() {
+            std::path::PathBuf::from(cwd).join(arg)
+        } else {
+            std::env::current_dir()?.join(arg)
+        };
+        let new_dir = std::fs::canonicalize(&target)
+            .with_context(|| format!("failed to change directory to '{:?}'", target))?;
+        if new_dir.is_dir() {
+            jarvis_io.write_working_directory(new_dir.to_string_lossy().as_ref());
+            return Ok(format!("Changed directory to {}", new_dir.display()));
+        } else {
+            return Ok(format!("Directory not found: {}", new_dir.display()));
+        }
+    }
+    // On Windows use `cmd /C`, on other platforms use `sh -c` and set current_dir if configured.
     #[cfg(target_os = "windows")]
-    let output = Command::new("cmd")
-        .args(["/C", trimmed])
-        .output()
-        .context("failed to execute shell command")?;
+    let mut cmd = Command::new("cmd");
     #[cfg(not(target_os = "windows"))]
-    let output = Command::new("sh")
-        .args(["-c", trimmed])
-        .output()
-        .context("failed to execute shell command")?;
+    let mut cmd = Command::new("sh");
+    #[cfg(target_os = "windows")]
+    cmd.args(["/C", trimmed]);
+    #[cfg(not(target_os = "windows"))]
+    cmd.args(["-c", trimmed]);
+    if let Some(cwd) = jarvis_io.read_working_directory() {
+        cmd.current_dir(cwd.trim());
+    }
+    let output = cmd.output().context("failed to execute shell command")?;
 
     let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
@@ -79,20 +101,30 @@ pub fn run_codex_cli(instruction: &str) -> Result<String> {
     // enforce a timeout.
     use std::time::Duration;
     // Spawn the Codex CLI process with piped stdout/stderr
+    // Spawn the Codex CLI process, using persistent working directory if set.
+    let jarvis_io = crate::jarvis_io::JarvisIO::new();
     #[cfg(target_os = "windows")]
-    let mut child = Command::new("cmd")
-        .args(["/C", &full_cmd])
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .context("failed to spawn codex CLI")?;
+    let mut child = {
+        let mut c = Command::new("cmd");
+        c.args(["/C", &full_cmd])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped());
+        if let Some(cwd) = jarvis_io.read_working_directory() {
+            c.current_dir(cwd.trim());
+        }
+        c.spawn().context("failed to spawn codex CLI")?
+    };
     #[cfg(not(target_os = "windows"))]
-    let mut child = Command::new("sh")
-        .args(["-c", &full_cmd])
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .context("failed to spawn codex CLI")?;
+    let mut child = {
+        let mut c = Command::new("sh");
+        c.args(["-c", &full_cmd])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped());
+        if let Some(cwd) = jarvis_io.read_working_directory() {
+            c.current_dir(cwd.trim());
+        }
+        c.spawn().context("failed to spawn codex CLI")?
+    };
     // Use wait_timeout to wait for the process with a timeout
     let timeout = Duration::from_secs(60);
     match child
