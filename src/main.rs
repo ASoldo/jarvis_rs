@@ -36,6 +36,8 @@ mod tts_engine;
 use agent::Agent;
 use jarvis_io::JarvisIO;
 use speech::SpeechRecognizer;
+use tokio::signal;
+use tokio::time::sleep;
 use tts_engine::TtsEngine;
 
 // Note: we used to filter out common filler words ("the", "uh", "um", etc.)
@@ -110,6 +112,15 @@ async fn main() -> Result<()> {
         "Jarvis initialised. Waiting for wake word '{}'.",
         trigger_word
     );
+
+    // Handle Ctrl-C (SIGINT) to allow graceful shutdown
+    let _shutdown = tokio::spawn(async move {
+        if let Err(e) = signal::ctrl_c().await {
+            log::error!("Failed to listen for Ctrl-C: {e}");
+        }
+        log::info!("Received Ctrl-C, shutting down");
+        std::process::exit(0);
+    });
 
     loop {
         if !conversation_mode {
@@ -213,7 +224,8 @@ async fn main() -> Result<()> {
                                     let speak_fut = tts.speak(&reply);
                                     tokio::pin!(speak_fut);
                                     // Poll for cancel status periodically
-                                    let mut cancel_check = tokio::time::interval(Duration::from_millis(200));
+                                    let mut cancel_check =
+                                        tokio::time::interval(Duration::from_millis(200));
                                     loop {
                                         tokio::select! {
                                             res = &mut speak_fut => {
@@ -234,7 +246,9 @@ async fn main() -> Result<()> {
                                 }
                                 if was_canceled {
                                     tts.stop().await.ok();
+                                    jarvis_io.write_status("canceled");
                                     jarvis_io.cancel_tts();
+                                    sleep(Duration::from_millis(500)).await;
                                 }
                                 jarvis_io.write_status("listening");
                             }

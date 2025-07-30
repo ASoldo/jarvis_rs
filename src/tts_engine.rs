@@ -56,7 +56,9 @@ impl TtsEngine {
             self.rhvoice_process = None;
         } else {
             // Stop any ongoing utterances.
-            self.tts.stop().map_err(|e| anyhow!(format!("Failed to stop TTS: {:?}", e)))?;
+            self.tts
+                .stop()
+                .map_err(|e| anyhow!(format!("Failed to stop TTS: {:?}", e)))?;
         }
         Ok(())
     }
