@@ -12,8 +12,9 @@ Jarvis is a fully offline, voice-activated personal assistant built in Rust. Ins
 * Voice responses using RHVoice
 * Tool calling support via:
 
-  * `shell_task`: Run shell commands in a persistent working directory
+  * `shell_task`: Run shell commands (e.g., ls, pwd, cat, date, find) in a persistent working directory
   * `codex_cli_task`: Use `codex --full-auto` to scaffold code or execute tasks
+  * External tools (e.g., curl, grep)
 * Rust-native state tracking via `~/.jarvis`:
 
   * `jarvis.status`, `jarvis.spoken`, `jarvis.heard`, `jarvis.working_directory`, etc.
