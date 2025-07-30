@@ -24,7 +24,7 @@ use std::time::{Duration, Instant};
 use anyhow::{anyhow, Context, Result};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::SampleFormat;
-use vosk::{Model, Recognizer};
+use vosk::{Model, Recognizer, DecodingState};
 
 /// A simple wrapper around Vosk for capturing a short phrase from the microphone
 /// and converting it to text.
@@ -216,10 +216,10 @@ impl SpeechRecognizer {
 
         let start_time = Instant::now();
         let mut samples: Vec<i16> = Vec::new();
-        // Stop recording early when we see real silence after speech.
-        // Increase threshold to ignore low-level hum and allow longer pauses.
+        // Use manual silence detection and Vosk endpoint detection to stop recording early.
+        // Increase threshold to ignore low-level hum and require ~2s pause.
         let silence_threshold: i16 = 1000;
-        let silence_timeout = Duration::from_millis(1500);
+        let silence_timeout = Duration::from_secs(2);
         let min_capture_time = Duration::from_millis(500);
         let mut last_speech = Instant::now();
         let mut speech_started = false;
@@ -232,17 +232,22 @@ impl SpeechRecognizer {
                 .unwrap_or_else(|| Duration::from_millis(0));
             match rx.recv_timeout(timeout) {
                 Ok(chunk) => {
-                    // Append the samples to our buffer
+                    // Feed chunk to Vosk recogniser; if it finalizes an utterance (endpoint), stop recording.
+                    if matches!(recogniser.accept_waveform(&chunk)?, DecodingState::Finalized) {
+                        samples.extend_from_slice(&chunk);
+                        break;
+                    }
+                    // Append samples for fallback silence detection.
                     samples.extend_from_slice(&chunk);
-                    // Determine if this chunk contains speech by checking
-                    // if any sample exceeds the threshold.
+                    // Determine if this chunk contains speech by checking if any sample
+                    // exceeds the threshold.
                     let has_speech = chunk.iter().any(|s| s.wrapping_abs() > silence_threshold);
                     if has_speech {
                         speech_started = true;
                         last_speech = Instant::now();
                     }
-                    // If we've already captured at least `min_capture_time` of audio
-                    // and we've not heard speech for `silence_timeout`, break early.
+                    // If we've captured at least `min_capture_time` and have seen
+                    // silence longer than `silence_timeout`, break early.
                     if speech_started
                         && start_time.elapsed() > min_capture_time
                         && last_speech.elapsed() > silence_timeout
@@ -264,16 +269,15 @@ impl SpeechRecognizer {
         drop(stream);
         drop(tx_err);
 
-        // If we captured any audio, feed it into the recogniser and fetch the
-        // final result. Otherwise return an empty string.
-        if !samples.is_empty() {
-            recogniser.accept_waveform(&samples)?;
-            let final_result = recogniser.final_result();
-            // `single()` returns `Option<CompleteResultSingle>`; extract
-            // the recognised transcript if present.
-            if let Some(single) = final_result.single() {
-                return Ok(single.text.to_string());
-            }
+        // If no audio captured, return an empty string
+        if samples.is_empty() {
+            return Ok(String::new());
+        }
+        // Fetch the final recognition result from Vosk
+        let final_result = recogniser.final_result();
+        // `single()` returns `Option<CompleteResultSingle>`; extract the final transcript
+        if let Some(single) = final_result.single() {
+            return Ok(single.text.to_string());
         }
         Ok(String::new())
     }
