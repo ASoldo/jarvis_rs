@@ -205,10 +205,38 @@ async fn main() -> Result<()> {
                                     reply
                                 };
                                 log::info!("Assistant response: {}", reply);
-                                jarvis_io.write_spoken(&reply); // <-- added
-                                jarvis_io.write_status("speaking"); // <-- added
-                                tts.speak(&reply).await.ok();
-                                jarvis_io.write_status("listening"); // <-- added
+                                jarvis_io.write_spoken(&reply);
+                                jarvis_io.write_status("speaking");
+                                // Speak and allow cancellation via status file
+                                let mut was_canceled = false;
+                                {
+                                    let speak_fut = tts.speak(&reply);
+                                    tokio::pin!(speak_fut);
+                                    // Poll for cancel status periodically
+                                    let mut cancel_check = tokio::time::interval(Duration::from_millis(200));
+                                    loop {
+                                        tokio::select! {
+                                            res = &mut speak_fut => {
+                                                let _ = res;
+                                                break;
+                                            }
+                                            _ = cancel_check.tick() => {
+                                                if jarvis_io.current_status()
+                                                    .map(|s| s.trim().eq_ignore_ascii_case("canceled"))
+                                                    .unwrap_or(false)
+                                                {
+                                                    was_canceled = true;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                if was_canceled {
+                                    tts.stop().await.ok();
+                                    jarvis_io.cancel_tts();
+                                }
+                                jarvis_io.write_status("listening");
                             }
                             Err(e) => log::error!("Agent error: {e}"),
                         }
@@ -227,4 +255,3 @@ async fn main() -> Result<()> {
         }
     }
 }
-

@@ -67,7 +67,9 @@ If no tool is required, answer briefly in plain sentences. Do not use Markdown f
         let response = match timeout(Duration::from_secs(15), self.client.generate(request)).await {
             Ok(res) => res.context("failed to query local language model")?,
             Err(_) => {
-                return Ok("The request to the language model timed out. Please try again.".to_string());
+                return Ok(
+                    "The request to the language model timed out. Please try again.".to_string(),
+                );
             }
         };
         log::debug!("Raw LLM response: {}", response.response);
@@ -171,9 +173,14 @@ If no tool is required, answer briefly in plain sentences. Do not use Markdown f
                             log::debug!("Parsed tool call: {}", tool_name);
                             match tool_name {
                                 "shell_task" => {
-                                    log::debug!("Executing shell_task with args: {:?}", json.get("arguments"));
+                                    log::debug!(
+                                        "Executing shell_task with args: {:?}",
+                                        json.get("arguments")
+                                    );
                                     if let Some(args) = json.get("arguments") {
-                                        if let Some(command) = args.get("command").and_then(|v| v.as_str()) {
+                                        if let Some(command) =
+                                            args.get("command").and_then(|v| v.as_str())
+                                        {
                                             let result = tools::run_shell_task(command)?;
                                             log::debug!("shell_task result: {}", result);
                                             return Ok(result);
@@ -181,14 +188,26 @@ If no tool is required, answer briefly in plain sentences. Do not use Markdown f
                                     }
                                 }
                                 "codex_cli_task" => {
-                                    log::debug!("Executing codex_cli_task with args: {:?}", json.get("arguments"));
+                                    log::debug!(
+                                        "Executing codex_cli_task with args: {:?}",
+                                        json.get("arguments")
+                                    );
                                     if let Some(args) = json.get("arguments") {
-                                        if let Some(command) = args.get("command").and_then(|v| v.as_str()) {
+                                        if let Some(command) =
+                                            args.get("command").and_then(|v| v.as_str())
+                                        {
                                             // Intercept simple shell commands that should be run via shell_task instead
                                             let cmd_lower = command.trim().to_lowercase();
-                                            let simple_shells = ["date", "ls", "pwd", "cat", "find", "uptime"];
-                                            if simple_shells.iter().any(|c| cmd_lower == *c || cmd_lower.starts_with(&format!("{} ", c))) {
-                                                log::debug!("Redirecting codex_cli_task '{}' to shell_task", command);
+                                            let simple_shells =
+                                                ["date", "ls", "pwd", "cat", "find", "uptime"];
+                                            if simple_shells.iter().any(|c| {
+                                                cmd_lower == *c
+                                                    || cmd_lower.starts_with(&format!("{} ", c))
+                                            }) {
+                                                log::debug!(
+                                                    "Redirecting codex_cli_task '{}' to shell_task",
+                                                    command
+                                                );
                                                 let result = tools::run_shell_task(command)?;
                                                 log::debug!("shell_task result: {}", result);
                                                 return Ok(result);

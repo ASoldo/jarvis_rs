@@ -238,7 +238,7 @@ impl SpeechRecognizer {
                     samples.extend_from_slice(&chunk);
                     // Determine if this chunk contains speech by checking
                     // if any sample exceeds the threshold.
-                    let has_speech = chunk.iter().any(|s| s.abs() > silence_threshold);
+                    let has_speech = chunk.iter().any(|s| s.wrapping_abs() > silence_threshold);
                     if has_speech {
                         speech_started = true;
                         last_speech = Instant::now();
@@ -280,4 +280,3 @@ impl SpeechRecognizer {
         Ok(String::new())
     }
 }
-

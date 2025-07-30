@@ -47,6 +47,20 @@ impl TtsEngine {
         })
     }
 
+    /// Stop any ongoing speech, either internal TTS or external RHVoice process.
+    pub async fn stop(&mut self) -> Result<()> {
+        if self.use_rhvoice {
+            if let Some(child) = self.rhvoice_process.as_mut() {
+                let _ = child.kill().await;
+            }
+            self.rhvoice_process = None;
+        } else {
+            // Stop any ongoing utterances.
+            self.tts.stop().map_err(|e| anyhow!(format!("Failed to stop TTS: {:?}", e)))?;
+        }
+        Ok(())
+    }
+
     /// Choose a voice by name. The supplied name is matched case
     /// insensitively against the available voices. If a matching voice
     /// cannot be found the previous voice remains active and an error is
@@ -103,10 +117,13 @@ impl TtsEngine {
                 // Close stdin to let rhvoice know the input is complete.
                 stdin.shutdown().await.ok();
             }
-            // We don't await the child process here; it's fine to let it run in
-            // the background while we return immediately. Store the handle
-            // so that the next call can terminate it if necessary.
+            // Store the handle so that cancellation can stop the process,
+            // then await completion of the speech process.
             self.rhvoice_process = Some(child);
+            if let Some(child) = self.rhvoice_process.as_mut() {
+                let _ = child.wait().await;
+            }
+            self.rhvoice_process = None;
             return Ok(());
         }
 
