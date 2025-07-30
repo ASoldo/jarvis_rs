@@ -116,7 +116,7 @@ async fn main() -> Result<()> {
     let idle_listen_secs: u64 = env::var("IDLE_LISTEN_SECS")
         .ok()
         .and_then(|v| v.parse::<u64>().ok())
-        .unwrap_or(1);
+        .unwrap_or(2);
     let convo_listen_secs: u64 = env::var("CONVO_LISTEN_SECS")
         .ok()
         .and_then(|v| v.parse::<u64>().ok())
