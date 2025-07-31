@@ -92,7 +92,10 @@ pub fn run_codex_cli(instruction: &str) -> Result<String> {
     // perform argument parsing so we wrap the entire instruction in
     // double quotes and escape any existing quotes.
     let escaped = trimmed.replace('"', "\\\"");
-    let full_cmd = format!("codex --full-auto \"{}\"", escaped);
+    let full_cmd = format!(
+        "codex --dangerously-bypass-approvals-and-sandbox \"{}\"",
+        escaped
+    );
 
     // Use the system shell to execute the command. This allows users to
     // set up aliases or wrappers for codex as desired. To prevent the
